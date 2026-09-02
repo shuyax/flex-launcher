@@ -168,6 +168,12 @@ int config_handler(void *user, const char *section, const char *name, const char
             if (max_buttons > 0)
                 config.max_buttons = (unsigned int) max_buttons;
         }
+        else if ((MATCH(name, SETTING_COLUMNS))) {
+            int columns = atoi(value);
+            if (columns > 0)
+                config.columns = (unsigned int) columns;
+        }
+
         else if (MATCH(name, SETTING_ICON_SIZE)) {
             Uint16 icon_size = (Uint16) atoi(value);
             if (icon_size >= MIN_ICON_SIZE && icon_size <= MAX_ICON_SIZE)
@@ -883,16 +889,34 @@ void convert_percent_to_int(char *string, int *result, int max_value)
 // A function to make sure all settings are in their correct range
 void validate_settings(Geometry *geo)
 {
-    // Reduce number of buttons if they can't all fit on screen
-    if (config.icon_size * config.max_buttons > (unsigned int) geo->screen_width) {
+    // // Reduce number of buttons if they can't all fit on screen
+    // if (config.icon_size * config.max_buttons > (unsigned int) geo->screen_width) {
+    //     unsigned int i;
+    //     for (i = config.max_buttons; i * config.icon_size > (unsigned int) geo->screen_width && i > 0; i--);
+    //     log_error(
+    //         "Not enough screen space for %i buttons, reducing to %i", 
+    //         config.max_buttons, 
+    //         i
+    //     );
+    //     config.max_buttons = i; 
+    // }
+    // Reduce number of columns if they can't all fit on screen
+    if (config.icon_size * config.columns >
+        (unsigned int) geo->screen_width) {
+
         unsigned int i;
-        for (i = config.max_buttons; i * config.icon_size > (unsigned int) geo->screen_width && i > 0; i--);
+
+        for (i = config.columns;
+             i * config.icon_size > (unsigned int) geo->screen_width && i > 0;
+             i--);
+
         log_error(
-            "Not enough screen space for %i buttons, reducing to %i", 
-            config.max_buttons, 
+            "Not enough screen space for %i columns, reducing to %i",
+            config.columns,
             i
         );
-        config.max_buttons = i; 
+
+        config.columns = i;
     }
 
     if (!config.titles_enabled)
@@ -967,11 +991,15 @@ void validate_settings(Geometry *geo)
         config.highlight_hpadding = config.icon_spacing / 2;
 
     // Reduce icon spacing and highlight padding if too large to fit onscreen
-    unsigned int required_length = calculate_width((int) config.max_buttons,
-                                       config.icon_spacing,
-                                       config.icon_size,
-                                       config.highlight_hpadding
-                                   );
+    // unsigned int required_length = calculate_width((int) config.max_buttons,
+    //                                    config.icon_spacing,
+    //                                    config.icon_size,
+    //                                    config.highlight_hpadding
+    //                                );
+    unsigned int required_length = calculate_width((int) config.columns,
+                config.icon_spacing,
+                config.icon_size,
+                config.highlight_hpadding);
     int highlight_hpadding = config.highlight_hpadding;
     int icon_spacing = config.icon_spacing;
     for (int i = 0; i < 100 && required_length > (unsigned int) geo->screen_width; i++) {
