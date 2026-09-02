@@ -199,6 +199,7 @@ typedef struct {
     int x_margin; // Distance between left edge of screen and x coordinate of root_entry icon
     int y_margin; // Distance between top edge of screen and y coordinate of all entry icons
     int x_advance; // Distance between icon x coordinate of adjacent entries
+    int y_advance; // Distance between icon y coordinate of adjacent entries
     int num_buttons; // Number of buttons shown on the screen
 } Geometry;
 
@@ -239,6 +240,7 @@ typedef struct {
 typedef struct {
     char *default_menu;
     unsigned int max_buttons;
+    unsigned int columns;
     bool vsync;
     int fps_limit;
     Uint32 application_timeout;
