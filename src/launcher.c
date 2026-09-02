@@ -32,6 +32,8 @@ static void calculate_button_geometry(Entry *entry, int buttons);
 static void render_buttons(Menu *menu);
 static void move_left(void);
 static void move_right(void);
+static void move_up(void);
+static void move_down(void);
 static void load_submenu(const char *submenu);
 static void load_back_menu(Menu *menu);
 static void draw_screen(void);
@@ -93,6 +95,7 @@ Config config = {
     .highlight_rx                     = DEFAULT_HIGHLIGHT_CORNER_RADIUS,
     .title_padding                    = -1,
     .max_buttons                      = DEFAULT_MAX_BUTTONS,
+    .columns                          = DEFAULT_COLUMNS,
     .icon_spacing                     = -1,
     .highlight_vpadding               = -1,
     .highlight_hpadding               = -1,
@@ -418,6 +421,10 @@ static void handle_keypress(SDL_Keysym *key)
         move_left();
     else if (key->sym == SDLK_RIGHT)
         move_right();
+    else if (key->sym == SDLK_UP)
+        move_up();
+    else if (key->sym == SDLK_DOWN)
+        move_down();
     else if (key->sym == SDLK_RETURN) {
         log_debug("Selected Entry:\n"
             "Title: %s\n"
@@ -622,16 +629,44 @@ static int load_menu_by_name(const char *menu_name, bool set_back_menu, bool res
 // A function to calculate the layout of the buttons
 static void calculate_button_geometry(Entry *entry, int buttons)
 {
+    // Number of columns actually used on this page.
+    int columns = MIN(config.columns, buttons);
+
+    // Number of rows needed for this page.
+    int rows = (buttons + columns - 1) / columns;
+
     // Calculate proper spacing
-    geo.x_margin = (geo.screen_width - config.icon_size*buttons -
-                   buttons*config.icon_spacing + config.icon_spacing) / 2;
+    geo.x_margin = (geo.screen_width - config.icon_size*columns -
+                   columns*config.icon_spacing + config.icon_spacing) / 2;
     geo.x_advance = config.icon_size + config.icon_spacing;
+
+    // Calculate vertical spacing.
+    geo.y_advance = config.icon_size +
+                    config.title_padding +
+                    geo.font_height +
+                    config.icon_spacing;
+    
+                        // Center the entire grid vertically.
+    geo.y_margin = (geo.screen_height -
+                    geo.y_advance * rows +
+                    config.icon_spacing) / 2;
+
+    log_debug("icon_size=%d icon_spacing=%d columns=%d rows=%d x_advance=%d y_advance=%d\n",
+          config.icon_size,
+          config.icon_spacing,
+          columns,
+          rows,
+          geo.x_advance,
+          geo.y_advance);
+
     geo.num_buttons = buttons;
 
     // Assign values to entries
     for (int i = 0; i < geo.num_buttons; i++) {
-            entry->icon_rect.x = geo.x_margin + i*geo.x_advance;
-            entry->icon_rect.y = geo.y_margin;
+            int column = i % columns;
+            int row = i / columns;
+            entry->icon_rect.x = geo.x_margin + column * geo.x_advance;
+            entry->icon_rect.y = geo.y_margin + row * geo.y_advance;
             entry->icon_rect.w = config.icon_size;
             entry->icon_rect.h = config.icon_size;
             entry->text_rect.x = entry->icon_rect.x +
@@ -737,6 +772,30 @@ static void move_right()
             highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
         calculate_button_geometry(current_menu->root_entry, (int) MIN(current_menu->num_entries, config.max_buttons));
     }
+}
+
+static void move_up() {
+    // If we are not in the topmost position, move highlight up
+    if ((int) current_menu->highlight_position >= config.columns) {
+        if (config.highlight)
+            highlight->rect.y -= geo.y_advance;
+
+        current_menu->highlight_position -= config.columns;
+        current_entry = advance_entries(current_entry, config.columns, DIRECTION_LEFT);
+
+    }
+}
+
+static void move_down() {
+    // If we are not in the bottommost position, move highlight down
+    if ((int) current_menu->highlight_position + config.columns < geo.num_buttons) {
+        if (config.highlight) {
+            highlight->rect.y += geo.y_advance;
+        }
+        current_menu->highlight_position += config.columns;
+        current_entry = advance_entries(current_entry, config.columns, DIRECTION_RIGHT);
+    }
+
 }
 
 // A function to load a submenu
