@@ -168,7 +168,7 @@ int config_handler(void *user, const char *section, const char *name, const char
             if (max_buttons > 0)
                 config.max_buttons = (unsigned int) max_buttons;
         }
-        else if ((MATCH(name, SETTING_COLUMNS))) {
+        else if (MATCH(name, SETTING_COLUMNS)) {
             int columns = atoi(value);
             if (columns > 0)
                 config.columns = (unsigned int) columns;
