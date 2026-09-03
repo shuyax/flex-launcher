@@ -30,6 +30,7 @@ static void init_slideshow(void);
 static void init_screensaver(void);
 static void calculate_button_geometry(Entry *entry, int buttons);
 static void render_buttons(Menu *menu);
+static void render_selected_title(void);
 static void move_left(void);
 static void move_right(void);
 static void move_up(void);
@@ -184,7 +185,11 @@ SDL_Thread *clock_thread              = NULL;
 SDL_Event event;
 SDL_SysWMinfo wm_info;
 SDL_DisplayMode display_mode;
+SDL_Texture *selected_title_texture   = NULL;
+SDL_Rect selected_title_rect;
+Entry *selected_title_entry           = NULL;
 TextInfo title_info;
+TextInfo selected_title_info;
 Ticks ticks;
 Geometry geo;
 Uint32 refresh_period;
@@ -320,6 +325,9 @@ static void init_sdl_ttf()
     if (error)
         log_fatal("Could not load title font");
     geo.font_height = config.titles_enabled ? TTF_FontHeight(title_info.font) : 0;
+    selected_title_info = title_info;
+    selected_title_info.max_width = geo.screen_width - 2 * geo.screen_margin;
+    selected_title_info.oversize_mode = OVERSIZE_SHRINK;
 }
 
 // A function to close subsystems and free memory before quitting
@@ -328,6 +336,11 @@ static void cleanup()
     // Wait until all threads have completed
     SDL_WaitThread(Slideshowhread, NULL);
     SDL_WaitThread(clock_thread, NULL);
+    // Destroy selected title texture
+    if (selected_title_texture != NULL) {
+        SDL_DestroyTexture(selected_title_texture);
+        selected_title_texture = NULL;
+    }
     
     // Destroy renderer and window
     if (renderer != NULL) {
@@ -694,6 +707,39 @@ static void render_buttons(Menu *menu)
     menu->rendered = true;
 }
 
+static void render_selected_title() {
+    // Destroy the previous selected title texture
+    if (selected_title_texture != NULL) {
+        SDL_DestroyTexture(selected_title_texture);
+        selected_title_texture = NULL;
+    }
+
+    // Nothing to render
+    if (!config.titles_enabled || current_entry == NULL)
+        return;
+
+    int text_height = 0;
+
+    // Render the selected title using the full available screen width
+    selected_title_texture = render_text_texture(
+        current_entry->title,
+        &selected_title_info,
+        &selected_title_rect,
+        &text_height
+    );
+
+    if (selected_title_texture == NULL)
+        return;
+
+    // Center the title horizontally
+    selected_title_rect.x = (geo.screen_width - selected_title_rect.w) / 2;
+
+    // Position the title near the bottom of the screen
+    selected_title_rect.y = geo.screen_height - geo.screen_margin - selected_title_rect.h;
+
+    selected_title_entry = current_entry;
+}
+
 // A function to move the selection left when clicked by user
 static void move_left()
 {
@@ -865,6 +911,18 @@ static void draw_screen()
                 SDL_RenderCopy(renderer, entry->title_texture, NULL, &entry->text_rect);
             entry = entry-> next;
         }
+        // Render the selected entry's title if the selection changed
+        if (config.titles_enabled && selected_title_entry != current_entry)
+            render_selected_title();
+
+        // Draw the selected entry's title
+        if (config.titles_enabled && selected_title_texture != NULL)
+            SDL_RenderCopy(
+                renderer,
+                selected_title_texture,
+                NULL,
+                &selected_title_rect
+            );
 
         // Draw screensaver
         if (state.screensaver_active)
