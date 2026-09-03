@@ -697,69 +697,72 @@ static void render_buttons(Menu *menu)
 // A function to move the selection left when clicked by user
 static void move_left()
 {
-    // If we are not in leftmost position, move highlight left
-    if (current_menu->highlight_position > 0) {
+    int columns = MIN(config.columns, geo.num_buttons);
+    // If we are not in the leftmost position, move highlight left
+    if ((int) (current_menu->highlight_position % columns) > 0) {
         if (config.highlight)
             highlight->rect.x -= geo.x_advance;
         current_menu->highlight_position--;
         current_entry = current_entry->previous;
     }
-
-    // If we are in leftmost position...
-    else if (current_menu->highlight_position == 0 && (current_menu->page > 0 || config.wrap_entries)) {
-        unsigned int buttons;
-        current_entry = current_entry->previous;
-
-        // Load the previous page if there is a valid previous entry
-        if (current_entry) {
-            buttons = config.max_buttons;
-            current_menu->root_entry = advance_entries(current_menu->root_entry, (int) buttons, DIRECTION_LEFT);
-            current_menu->page--;
-        }
-
-        // If the user has the wrap entries setting, select the last entry in the menu
-        else {
-            current_entry = advance_entries(current_menu->first_entry, (int) current_menu->num_entries - 1, DIRECTION_RIGHT);
-            unsigned int num_pages = DIV_ROUND_UP(current_menu->num_entries, config.max_buttons);
-            current_menu->root_entry = advance_entries(current_menu->root_entry,
-                (int) ((num_pages - 1 - current_menu->page) * config.max_buttons),
-                DIRECTION_RIGHT
-            );
-            current_menu->page = num_pages - 1;
-            buttons = current_menu->num_entries - current_menu->page * config.max_buttons;
-        }
-
-        calculate_button_geometry(current_menu->root_entry, (int) buttons);
-        if (config.highlight)
+    // Current item is at the left edge of the row, but there are more entries in the menu. Load the previous page.
+    else if (current_menu->page > 0) {
+        current_menu->page--;
+        current_menu->root_entry = advance_entries(current_menu->root_entry, config.max_buttons, DIRECTION_LEFT);
+        current_entry = advance_entries(current_menu->root_entry, config.max_buttons - 1, DIRECTION_RIGHT);
+        current_menu->highlight_position = config.max_buttons - 1;
+        calculate_button_geometry(current_menu->root_entry, config.max_buttons);
+        if (config.highlight) {
             highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
+            highlight->rect.y = current_entry->icon_rect.y - config.highlight_vpadding;
+        }
+    }
+    // If the user has the wrap entries setting, select the last entry in the menu
+    else if (config.wrap_entries)  {
+        unsigned int num_pages = DIV_ROUND_UP(current_menu->num_entries, config.max_buttons);
+        current_menu->page = num_pages - 1;
+        current_entry = advance_entries(current_menu->first_entry, (int) current_menu->num_entries - 1, DIRECTION_RIGHT);
+        current_menu->root_entry = advance_entries(current_menu->first_entry,
+            (int) (current_menu->page * config.max_buttons),
+            DIRECTION_RIGHT
+        );
+        unsigned int buttons = current_menu->num_entries - current_menu->page * config.max_buttons;
+        if (buttons > config.max_buttons)
+            buttons = config.max_buttons;
         current_menu->highlight_position = buttons - 1;
+        calculate_button_geometry(current_menu->root_entry, (int) buttons);
+        if (config.highlight) {
+            highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
+            highlight->rect.y = current_entry->icon_rect.y - config.highlight_vpadding;
+        }
     }
 }
 
 // A function to move the selection right when clicked by the user
 static void move_right()
 {
+    int columns = MIN(config.columns, geo.num_buttons);
     // If we are not in the rightmost position, move highlight right
-    if ((int) current_menu->highlight_position < (geo.num_buttons - 1)) {
+    if ((int) (current_menu->highlight_position % columns) < (columns - 1)) {
         if (config.highlight)
             highlight->rect.x += geo.x_advance;
         current_menu->highlight_position++;
         current_entry = current_entry->next;
     }
-
-    // If we are in the rightmost postion, but there are more entries in the menu, load next page
-    else if (current_menu->highlight_position + current_menu->page*config.max_buttons <
-    (current_menu->num_entries - 1)) {
-        unsigned int buttons = current_menu->num_entries - (current_menu->page + 1)*config.max_buttons;
-        if (buttons > config.max_buttons)
-            buttons = config.max_buttons;
-        current_entry = current_entry->next;
-        current_menu->root_entry = current_entry;
-        calculate_button_geometry(current_menu->root_entry, (int) buttons);
-        if (config.highlight)
-            highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
+    // Current item is at the right edge of the row, but there are more entries in the menu. Load the next page.
+    else if ((current_menu->page + 1) * config.max_buttons < current_menu->num_entries) {
+        current_menu->root_entry = advance_entries(current_menu->root_entry, config.max_buttons, DIRECTION_RIGHT);
+        current_entry = current_menu->root_entry;
         current_menu->page++;
         current_menu->highlight_position = 0;
+        unsigned int buttons = current_menu->num_entries - current_menu->page * config.max_buttons;
+        if (buttons > config.max_buttons)
+            buttons = config.max_buttons;
+        calculate_button_geometry(current_menu->root_entry, (int) buttons);
+        if (config.highlight) {
+            highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
+            highlight->rect.y = current_entry->icon_rect.y - config.highlight_vpadding;
+        }
     }
 
     // If user has the wrap entries setting, reset menu to first entry
@@ -768,9 +771,11 @@ static void move_right()
         current_menu->root_entry = current_entry;
         current_menu->highlight_position = 0;
         current_menu->page = 0;
-        if (config.highlight)
-            highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
         calculate_button_geometry(current_menu->root_entry, (int) MIN(current_menu->num_entries, config.max_buttons));
+        if (config.highlight) {
+            highlight->rect.x = current_entry->icon_rect.x - config.highlight_hpadding;
+            highlight->rect.y = current_entry->icon_rect.y - config.highlight_vpadding;
+        }
     }
 }
 
